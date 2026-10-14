@@ -1,0 +1,48 @@
+{
+  "info": {
+    "name": "Blacklist Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://blacklist-env.eba-uiks4ffx.us-east-2.elasticbeanstalk.com" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Ping",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "url": { "raw": "{{base_url}}/ping", "host": ["{{base_url}}"], "path": ["ping"] }
+      }
+    },
+    {
+      "name": "Agregar email a la lista negra",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"email\": \"cliente@correo.com\",\n    \"app_uuid\": \"6f1c2b9e-3a4d-4c5e-9f00-112233445566\",\n    \"blocked_reason\": \"Envía spam\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": { "raw": "{{base_url}}/blacklists", "host": ["{{base_url}}"], "path": ["blacklists"] }
+      }
+    },
+    {
+      "name": "Consultar email en la lista negra",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/blacklists/cliente@correo.com",
+          "host": ["{{base_url}}"],
+          "path": ["blacklists", "cliente@correo.com"]
+        }
+      }
+    }
+  ]
+}

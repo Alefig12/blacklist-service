@@ -113,18 +113,29 @@ IAM → Roles → **Create role** → *AWS service* → caso de uso **EC2** → 
 
 ### 2. Security group para las instancias de la app
 
-EC2 → Security Groups → **Create security group**: nombre `blacklist-app-sg`, VPC por defecto, **sin reglas de entrada** (Beanstalk crea las suyas para el balanceador). Este grupo solo sirve para darle permiso a la base de datos.
+EC2 → Security Groups → **Create security group**: nombre `blacklist-app-sg` (descripción *Blacklist App*), VPC por defecto, **sin reglas de entrada** (Beanstalk crea las suyas para el balanceador). Este grupo solo sirve para darle permiso a la base de datos.
 
 ### 3. Base de datos en RDS 📸
 
-RDS → **Create database**:
+Aurora and RDS → **Create database**:
 
-- *Standard create* → **PostgreSQL** (versión por defecto) → plantilla **Free tier** (o *Sandbox*, la de menor costo).
-- DB instance identifier: `blacklist-db` · Master username: `postgres` · *Self managed* · contraseña (**guardarla**).
-- Instance class `db.t3.micro` o `db.t4g.micro` · Storage 20 GiB · desmarcar *storage autoscaling*.
-- Connectivity: *Don't connect to an EC2 compute resource* · VPC por defecto · **Public access: No** · VPC security group: *Create new* → `blacklist-db-sg`.
-- *Additional configuration* → **Initial database name: `blacklist`**. Desactivar Performance Insights y Enhanced monitoring.
-- Create (tarda 5–10 min). Copiar el **Endpoint** (pestaña *Connectivity & security*).
+| Campo | Valor |
+|---|---|
+| Creation method | *Full configuration* |
+| Engine | **PostgreSQL 18.3-R2** |
+| DB instance identifier | `blacklist-db` |
+| Credentials | Master username `postgres` · *Self managed* · contraseña propia |
+| Instance class | Burstable · **`db.t4g.micro`** |
+| Storage | General Purpose SSD (gp2) · **20 GiB** · storage autoscaling desactivado |
+| Compute resource | *Don't connect to an EC2 compute resource* |
+| VPC / DB subnet group | VPC por defecto · `default-vpc-…` |
+| Public access | **No** |
+| VPC security group | *Create new* → `blacklist-db-sg` |
+| Availability Zone | *No preference* |
+| Initial database name | **`blacklist`** |
+| DB parameter group | `default.postgres18` |
+| Encryption | Activado (`aws/rds`) |
+| Backup | Automated backup activado · retención 1 día |
 
 Luego, EC2 → Security Groups → `blacklist-db-sg` → **Edit inbound rules**: dejar solo la regla *PostgreSQL / TCP 5432* con origen **`blacklist-app-sg`**.
 
@@ -135,23 +146,36 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"   # JWT_SECRET_KEY,
 python scripts/build_zip.py
 ```
 
-### 5. Crear la aplicación y el ambiente en Beanstalk 📸
+### 5. Crear el ambiente en Beanstalk 📸
 
-Elastic Beanstalk → **Create application**:
+Elastic Beanstalk → **Create environment**:
 
-1. **Configure environment**: *Web server environment* · Application name `blacklist-service` · Environment name `blacklist-env` · Platform **Python**, rama *Python 3.14 running on 64bit Amazon Linux 2023* · Application code: **Upload your code**, version label `v1.0.0`, archivo local `dist/blacklist-service-v1.0.0.zip` · Presets: **High availability**.
-2. **Service access**: Service role → crear/usar `aws-elasticbeanstalk-service-role` · EC2 instance profile → `aws-elasticbeanstalk-ec2-role` · key pair opcional.
-3. **Networking, database and tags**: VPC por defecto · **Public IP address: Activated** · seleccionar las subredes (instancias y balanceador) excepto `us-east-1e`. **No** habilitar la base de datos aquí (usamos la RDS del paso 3).
-4. **Instance traffic and scaling**:
-   - EC2 security groups: marcar **`blacklist-app-sg`**.
-   - Capacity: *Load balanced* · **Min 3 / Max 6** · On-Demand · instance types **solo `t3.micro`**.
-   - Load balancer: *Application load balancer*, dedicado · listener HTTP 80.
-   - **Processes** → `default` → Edit → **Health check path: `/ping`** 📸 (health checks de la app).
-5. **Updates, monitoring and logging**:
-   - Health reporting: *Enhanced* · Managed platform updates: **desactivado**.
-   - Rolling updates and deployments: deployment policy **All at once** (para el primer despliegue).
-   - **Environment properties**: `RDS_HOSTNAME` (endpoint), `RDS_PORT=5432`, `RDS_DB_NAME=blacklist`, `RDS_USERNAME=postgres`, `RDS_PASSWORD`, `JWT_SECRET_KEY`.
-6. **Review → Submit**. Esperar a que *Health* quede en **Ok** (5–10 min).
+| Sección | Campo | Valor |
+|---|---|---|
+| Deployment mode | | **Standard** |
+| Environment details | Application name / Environment name | `blacklist-service` / `blacklist-env` |
+| Platform details | Platform · branch · version | Python · *Python 3.14 running on 64bit Amazon Linux 2023* · 4.13.10 |
+| Application code | | *Local file* → `blacklist-service-v1.0.0.zip` · version label `v1.0.0` |
+| Environment properties | | `RDS_HOSTNAME` (endpoint de RDS) · `RDS_PORT=5432` · `RDS_DB_NAME=blacklist` · `RDS_USERNAME=postgres` · `RDS_PASSWORD` · `JWT_SECRET_KEY` |
+| Platform-specific options | Proxy server | nginx |
+| Service access | Service role | `aws-elasticbeanstalk-service-role` |
+| | EC2 instance profile | `aws-elasticbeanstalk-ec2-role` |
+| Infrastructure | Environment tier | Web server environment |
+| | Environment type | **Load balanced** · Min **3** / Max **6** |
+| | Architecture · instance types | x86_64 · **solo `t3.micro`** |
+| | IMDSv1 | Disable |
+| Networking | VPC · instance subnets | VPC por defecto · `us-east-2a`, `us-east-2b`, `us-east-2c` |
+| | EC2 security groups | **`blacklist-app-sg`** |
+| | Load balancer | Application Load Balancer · Dedicated · Public · Listener 80 |
+| | Process `default` → Health check 📸 | HTTP code `200` · **Health check path `/ping`** · timeout 5 · interval 15 · deregistration delay 20 · healthy threshold 3 · unhealthy threshold 5 |
+| | Load balancer subnets | `us-east-2a`, `us-east-2b`, `us-east-2c` |
+| | Instance public IP address | **Enabled** |
+| Monitoring and updates | Monitoring | Enhanced · 5 minutes |
+| | Deployment policy | **All at once** |
+| | Additional deployment settings | Rolling update type *Disabled* · Enable health check · Health threshold *Ok* · Command timeout 600 |
+| | Managed platform updates | Desactivado |
+
+**Create**. Esperar a que *Health* quede en **Ok** (5–10 min).
 
 ### 6. Verificar
 
