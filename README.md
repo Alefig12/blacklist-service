@@ -53,6 +53,23 @@ Todos excepto `/ping` requieren el header `Authorization: Bearer <token>`.
 
 Si el email no está en la lista: `"is_blacklisted": false` y `"blocked_reason": null`.
 
+## Postman
+
+**Documentación publicada:** https://documenter.getpostman.com/view/7736655/2sBYHSxLCX
+
+En [`postman/`](postman/) están la colección y dos environments (`AWS` y `Local`):
+
+- **16 escenarios** agrupados por endpoint: casos exitosos, email duplicado (409), validaciones (400) y token ausente o inválido (401). Cada uno tiene tests (`pm.test`) y un ejemplo de respuesta guardado para la documentación.
+- Los emails de prueba se generan en los pre-request scripts, así que la colección se puede ejecutar varias veces sin conflictos.
+- Importar la colección y el environment, asignar el token a la variable `token` y ejecutar la colección completa con el *Collection Runner*, **en orden**.
+
+Desde la terminal (con [Newman](https://www.npmjs.com/package/newman)):
+
+```powershell
+npx newman run postman/blacklist-service.postman_collection.json `
+  -e postman/blacklist-service-aws.postman_environment.json --env-var "token=<TOKEN>"
+```
+
 ## Configuración (variables de entorno)
 
 | Variable | Descripción |
