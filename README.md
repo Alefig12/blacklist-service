@@ -209,10 +209,12 @@ Elastic Beanstalk → **Create environment**:
 ## Nuevas versiones (estrategias de despliegue)
 
 1. Cambiar `VERSION` en `app/version.py` (`1.0.1`, `1.0.2`, …) y ejecutar `python scripts/build_zip.py`.
-2. En Beanstalk: Configuration → *Rolling updates and deployments* → elegir la política (All at once, Rolling, Rolling with additional batch, Immutable, Traffic splitting).
-3. **Upload and deploy** con el zip nuevo y la etiqueta `v<VERSION>`.
-4. Mientras despliega, consultar `/ping` en bucle para ver qué instancias responden con la versión vieja y cuáles con la nueva:
+2. En Beanstalk: Configuración → *Supervisión y actualizaciones* → elegir la política (Todos a la vez, Continua, Continua con lote adicional, Inmutable, División del tráfico).
+3. **Cargar e implementar** con el zip nuevo y la etiqueta `v<VERSION>`. Revisar en *Preferencias de implementación* que la política sea la misma: la del diálogo tiene prioridad y sobrescribe la configurada en el ambiente.
+4. Mientras despliega, monitorear `/ping` para ver qué instancias responden con la versión vieja y cuáles con la nueva:
 
 ```powershell
-while ($true) { (Invoke-RestMethod http://<dominio>/ping) | ConvertTo-Json -Compress; Start-Sleep 1 }
+.\scripts\monitor_deploy.ps1 -Name rolling-v1.0.3
 ```
+
+El script guarda cada respuesta en `deploy-logs/<nombre>.csv` (ignorado por git) y, al detenerlo con Ctrl+C, imprime un resumen con los errores, la primera y última respuesta de cada versión y las respuestas por instancia.
