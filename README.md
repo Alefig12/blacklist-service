@@ -119,6 +119,34 @@ python scripts/build_zip.py     # -> dist/blacklist-service-v<VERSION>.zip
 
 No comprimir con el "Enviar a > Carpeta comprimida" de Windows: genera rutas con `\` que fallan en Linux. La versión sale de `app/version.py`.
 
+## Integración continua (AWS CodeBuild + CodePipeline)
+
+Cada push a `main` dispara el pipeline: CodePipeline toma el código de GitHub y CodeBuild ejecuta [`buildspec.yml`](buildspec.yml). No hay despliegue automático: el pipeline termina en el artefacto.
+
+| Fase | Qué hace |
+|---|---|
+| `install` | Python 3.13 e instalación de `requirements-dev.txt` |
+| `build` | `pytest` con reporte JUnit y de cobertura (mínimo 80 %); si pasa, `python scripts/build_zip.py` genera el zip |
+| `artifacts` | `blacklist-service-v<VERSION>.zip`, listo para cargar en Elastic Beanstalk |
+| `reports` | Resultados de las pruebas (`pruebas-unitarias`) y cobertura (`cobertura`) en la pestaña *Informes* de CodeBuild |
+
+Si una prueba falla o la cobertura baja del 80 %, el build falla y **no se genera el artefacto**.
+
+Las pruebas (`tests/`) usan SQLite en memoria, así que no dependen de un motor de base de datos. Hay un archivo por endpoint:
+
+| Archivo | Endpoint |
+|---|---|
+| `tests/test_ping.py` | `GET /ping` |
+| `tests/test_post_blacklists.py` | `POST /blacklists` |
+| `tests/test_get_blacklist.py` | `GET /blacklists/<email>` |
+
+Para correr lo mismo que CodeBuild en local:
+
+```powershell
+pytest --junitxml=reports/junit.xml --cov=app --cov-report=term --cov-fail-under=80
+python scripts/build_zip.py
+```
+
 ---
 
 ## Despliegue manual en AWS Elastic Beanstalk

@@ -8,3 +8,6 @@ dist/
 .idea/
 .vscode/
 deploy-logs/
+reports/
+.coverage
+coverage.xml

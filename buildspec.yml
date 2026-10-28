@@ -1,0 +1,42 @@
+# Integración continua en AWS CodeBuild: instala dependencias, ejecuta las pruebas
+# unitarias y, solo si pasan, genera el artefacto desplegable en Elastic Beanstalk.
+# No despliega: el zip queda como artefacto del build (S3 / CodePipeline).
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.13
+    commands:
+      - python --version
+      - pip install --root-user-action=ignore --upgrade pip
+      - pip install --root-user-action=ignore -r requirements-dev.txt
+
+  build:
+    # Los comandos de una fase se detienen en el primero que falle, así que si
+    # alguna prueba falla (o la cobertura baja del 80 %) no se genera el zip.
+    commands:
+      - mkdir -p reports
+      - >-
+        pytest
+        --junitxml=reports/junit.xml
+        --cov=app --cov-report=term --cov-report=xml:reports/coverage.xml
+        --cov-fail-under=80
+      - python scripts/build_zip.py
+
+reports:
+  pruebas-unitarias:
+    files:
+      - junit.xml
+    base-directory: reports
+    file-format: JUNITXML
+  cobertura:
+    files:
+      - coverage.xml
+    base-directory: reports
+    file-format: COBERTURAXML
+
+artifacts:
+  files:
+    - dist/blacklist-service-v*.zip
+  discard-paths: yes
