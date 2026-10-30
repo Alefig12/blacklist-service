@@ -123,6 +123,12 @@ No comprimir con el "Enviar a > Carpeta comprimida" de Windows: genera rutas con
 
 Cada push a `main` dispara el pipeline: CodePipeline toma el código de GitHub y CodeBuild ejecuta [`buildspec.yml`](buildspec.yml). No hay despliegue automático: el pipeline termina en el artefacto.
 
+| Recurso (us-east-2) | Nombre |
+|---|---|
+| Pipeline (CodePipeline) | `blacklist-service-ci` |
+| Proyecto de build (CodeBuild) | `blacklist-service-build` |
+| Conexión con GitHub | `github-blacklist-service` |
+
 | Fase | Qué hace |
 |---|---|
 | `install` | Python 3.13 e instalación de `requirements-dev.txt` |
