@@ -153,6 +153,30 @@ pytest --junitxml=reports/junit.xml --cov=app --cov-report=term --cov-fail-under
 python scripts/build_zip.py
 ```
 
+## Contenedor y entrega continua en AWS Fargate (Entrega 3)
+
+La imagen se define en el [`Dockerfile`](Dockerfile): Python 3.13 slim, solo las dependencias de ejecución, usuario sin privilegios y gunicorn en el puerto **8000** con `--preload` (las tablas se crean una sola vez antes de levantar los workers).
+
+| Archivo | Para qué |
+|---|---|
+| `Dockerfile` / `.dockerignore` | Imagen del microservicio |
+| `buildspec-cd.yml` | CodeBuild: pruebas → `docker build` → push a ECR → `imageDetail.json`. Si una prueba falla no se construye la imagen |
+| `taskdef.json` | Definición de tarea de ECS (Fargate, 0,25 vCPU / 512 MB). `<IMAGE1_NAME>` lo reemplaza CodePipeline con la imagen nueva |
+| `appspec.yaml` | Despliegue blue/green de CodeDeploy en ECS. `<TASK_DEFINITION>` lo reemplaza CodePipeline |
+
+Los secretos no están en el repositorio: la tarea lee `RDS_PASSWORD` y `JWT_SECRET_KEY` de **SSM Parameter Store** (`/blacklist-service/...`). Detrás del ALB de Fargate hay un solo proxy, por eso la tarea usa `PROXY_X_FOR=1`.
+
+Probar la imagen en local contra el PostgreSQL de `docker-compose`:
+
+```powershell
+docker build -t blacklist-service:local .
+docker compose up -d db
+docker run --rm -p 8000:8000 --network blacklist-service_default `
+  -e RDS_HOSTNAME=db -e RDS_PORT=5432 -e RDS_DB_NAME=blacklist -e RDS_USERNAME=postgres -e RDS_PASSWORD=postgres `
+  -e JWT_SECRET_KEY=un-secreto-local-de-al-menos-32-caracteres -e PROXY_X_FOR=1 blacklist-service:local
+# http://127.0.0.1:8000/ping
+```
+
 ---
 
 ## Despliegue manual en AWS Elastic Beanstalk

@@ -1,0 +1,50 @@
+{
+  "family": "blacklist-service",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "executionRoleArn": "arn:aws:iam::117227383263:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "blacklist-service",
+      "image": "<IMAGE1_NAME>",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "RDS_HOSTNAME", "value": "blacklist-db.cpy02ye44tcc.us-east-2.rds.amazonaws.com" },
+        { "name": "RDS_PORT", "value": "5432" },
+        { "name": "RDS_DB_NAME", "value": "blacklist" },
+        { "name": "RDS_USERNAME", "value": "postgres" },
+        { "name": "PROXY_X_FOR", "value": "1" }
+      ],
+      "secrets": [
+        {
+          "name": "RDS_PASSWORD",
+          "valueFrom": "arn:aws:ssm:us-east-2:117227383263:parameter/blacklist-service/RDS_PASSWORD"
+        },
+        {
+          "name": "JWT_SECRET_KEY",
+          "valueFrom": "arn:aws:ssm:us-east-2:117227383263:parameter/blacklist-service/JWT_SECRET_KEY"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/blacklist-service",
+          "awslogs-region": "us-east-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

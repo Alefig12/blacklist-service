@@ -1,0 +1,22 @@
+# Solo entran a la imagen requirements.txt, application.py y app/.
+.git
+.gitignore
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.coverage
+reports
+dist
+deploy-logs
+tests
+postman
+scripts
+*.md
+Procfile
+buildspec*.yml
+appspec.yaml
+taskdef.json
+docker-compose.yml
+pytest.ini
+requirements-dev.txt

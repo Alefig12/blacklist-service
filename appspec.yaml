@@ -1,0 +1,12 @@
+# Especificación de AWS CodeDeploy para el despliegue blue/green en Amazon ECS (Fargate).
+# CodePipeline reemplaza <TASK_DEFINITION> por la revisión de tarea que registra a partir
+# de taskdef.json con la imagen nueva.
+version: 0.0
+Resources:
+  - TargetService:
+      Type: AWS::ECS::Service
+      Properties:
+        TaskDefinition: <TASK_DEFINITION>
+        LoadBalancerInfo:
+          ContainerName: "blacklist-service"
+          ContainerPort: 8000

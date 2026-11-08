@@ -1,0 +1,81 @@
+# CI/CD en AWS CodeBuild para el despliegue en AWS Fargate (Entrega 3).
+# Ejecuta las pruebas unitarias y, solo si pasan, construye la imagen, la publica en
+# Amazon ECR y genera los artefactos que usa CodeDeploy (blue/green en ECS):
+#   imageDetail.json  -> URI de la imagen nueva (reemplaza <IMAGE1_NAME> en taskdef.json)
+#   taskdef.json      -> definición de tarea de ECS
+#   appspec.yaml      -> especificación del despliegue de CodeDeploy
+# Requiere modo privilegiado en el proyecto de CodeBuild (docker build) y permisos de push a ECR.
+version: 0.2
+
+env:
+  shell: bash
+  variables:
+    IMAGE_REPO_NAME: blacklist-service
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.13
+    commands:
+      - python --version
+      - pip install --root-user-action=ignore --upgrade pip
+      - pip install --root-user-action=ignore -r requirements-dev.txt
+
+  pre_build:
+    commands:
+      - ACCOUNT_ID=$(echo "$CODEBUILD_BUILD_ARN" | cut -d ':' -f 5)
+      - REGISTRY="$ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
+      - REPOSITORY_URI="$REGISTRY/$IMAGE_REPO_NAME"
+      - COMMIT="${CODEBUILD_RESOLVED_SOURCE_VERSION:-manual}"
+      - IMAGE_TAG="${COMMIT:0:7}-${CODEBUILD_BUILD_NUMBER}"
+      - echo "Imagen a construir $REPOSITORY_URI:$IMAGE_TAG"
+      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$REGISTRY"
+
+  build:
+    # Los comandos de una fase se detienen en el primero que falle: si alguna prueba
+    # falla (o la cobertura baja del 80 %) no se construye ni se publica la imagen.
+    commands:
+      - mkdir -p reports
+      - >-
+        pytest
+        --junitxml=reports/junit.xml
+        --cov=app --cov-report=term --cov-report=xml:reports/coverage.xml
+        --cov-fail-under=80
+      - docker build -t "$REPOSITORY_URI:$IMAGE_TAG" -t "$REPOSITORY_URI:latest" .
+      # Prueba de humo: la imagen debe arrancar y responder /ping antes de publicarla.
+      # Usa SQLite y un secreto ficticio: valida la imagen, no la configuración de la tarea.
+      - |
+        docker run -d --name smoke -p 8000:8000 \
+          -e DATABASE_URL=sqlite:////tmp/smoke.db -e JWT_SECRET_KEY=smoke-test \
+          "$REPOSITORY_URI:$IMAGE_TAG"
+        ok=0
+        for i in $(seq 1 15); do
+          if curl -fsS http://localhost:8000/ping; then ok=1; break; fi
+          sleep 2
+        done
+        echo
+        docker logs smoke
+        docker rm -f smoke
+        [ "$ok" = 1 ]
+      - docker push "$REPOSITORY_URI:$IMAGE_TAG"
+      - docker push "$REPOSITORY_URI:latest"
+      - printf '{"ImageURI":"%s"}' "$REPOSITORY_URI:$IMAGE_TAG" > imageDetail.json
+      - cat imageDetail.json
+
+reports:
+  pruebas-unitarias:
+    files:
+      - junit.xml
+    base-directory: reports
+    file-format: JUNITXML
+  cobertura:
+    files:
+      - coverage.xml
+    base-directory: reports
+    file-format: COBERTURAXML
+
+artifacts:
+  files:
+    - imageDetail.json
+    - appspec.yaml
+    - taskdef.json

@@ -54,6 +54,12 @@ def create_app(config_overrides=None):
             # Si la base no está disponible la app igual arranca (el health
             # check en /ping sigue respondiendo) y el error queda en los logs.
             logger.exception("No fue posible crear las tablas en la base de datos")
+        finally:
+            # Con gunicorn --preload la app se crea antes de los fork de los workers:
+            # se cierran las conexiones para que ningún worker herede una compartida.
+            # (No aplica a SQLite en memoria de las pruebas: cerrar la conexión borra la base).
+            if db.engine.url.get_backend_name() != "sqlite":
+                db.engine.dispose()
 
     return app
 
