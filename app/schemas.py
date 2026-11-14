@@ -13,7 +13,7 @@ class BlacklistCreateSchema(ma.Schema):
     email = fields.Email(required=True, validate=validate.Length(max=320))
     app_uuid = fields.UUID(required=True)
     blocked_reason = fields.String(
-        load_default=None, allow_none=True, validate=validate.Length(max=255)
+        load_default=None, allow_none=True, validate=validate.Length(max=300)
     )
 
     @pre_load
