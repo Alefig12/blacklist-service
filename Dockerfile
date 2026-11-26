@@ -14,7 +14,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-COPY application.py .
+COPY application.py newrelic.ini ./
 COPY app/ app/
 
 RUN useradd --create-home --uid 10001 appuser
@@ -22,6 +22,14 @@ USER appuser
 
 EXPOSE 8000
 
+# Agente APM de New Relic: se configura con variables de entorno (NEW_RELIC_LICENSE_KEY y
+# NEW_RELIC_APP_NAME las pone docker-compose o la tarea de ECS). Sin licencia el agente
+# no se activa y la aplicación funciona igual. newrelic.ini solo trae lo que no admite
+# variables de entorno (los errores esperados).
+ENV NEW_RELIC_CONFIG_FILE=/app/newrelic.ini \
+    NEW_RELIC_LOG=stdout \
+    NEW_RELIC_LOG_LEVEL=info
+
 # Detrás del ALB de Fargate hay un solo proxy: PROXY_X_FOR=1 (se define en la tarea de ECS).
 # --preload crea la app (y las tablas) una sola vez antes de levantar los workers.
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--preload", "--access-logfile", "-", "application:application"]
+CMD ["newrelic-admin", "run-program", "gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--preload", "--access-logfile", "-", "application:application"]

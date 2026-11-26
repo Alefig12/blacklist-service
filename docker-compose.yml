@@ -1,4 +1,7 @@
-# PostgreSQL local para desarrollo: docker compose up -d
+# Ambiente de desarrollo local.
+#   Solo PostgreSQL:            docker compose up -d db
+#   App + PostgreSQL + agente:  docker compose up -d --build   -> http://127.0.0.1:8000/ping
+# La licencia de New Relic se lee del archivo .env (no se sube al repositorio).
 services:
   db:
     image: postgres:17
@@ -8,3 +11,22 @@ services:
       POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d blacklist"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/blacklist
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-un-secreto-local-de-al-menos-32-caracteres}
+      PROXY_X_FOR: "0"
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      NEW_RELIC_APP_NAME: blacklist-service (dev)
+    depends_on:
+      db:
+        condition: service_healthy

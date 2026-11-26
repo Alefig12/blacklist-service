@@ -78,6 +78,8 @@ npx newman run postman/blacklist-service.postman_collection.json `
 | `DATABASE_URL` | Alternativa a las `RDS_*`: URI completa (`postgresql://usuario:clave@host:5432/db`) |
 | `JWT_SECRET_KEY` | Secreto con el que se firma y valida el token |
 | `PROXY_X_FOR` | Número de proxies delante de la app. Por defecto `2` (ALB + nginx). Usar `1` en un ambiente *Single instance* |
+| `NEW_RELIC_LICENSE_KEY` | Llave *INGEST - LICENSE* de New Relic. Sin ella el agente no se activa y la app funciona igual |
+| `NEW_RELIC_APP_NAME` | Nombre de la aplicación en New Relic: `blacklist-service (dev)` en local, `blacklist-service (prod)` en Fargate |
 
 ## Desarrollo local
 
@@ -176,6 +178,27 @@ docker run --rm -p 8000:8000 --network blacklist-service_default `
   -e JWT_SECRET_KEY=un-secreto-local-de-al-menos-32-caracteres -e PROXY_X_FOR=1 blacklist-service:local
 # http://127.0.0.1:8000/ping
 ```
+
+## Monitoreo con New Relic (Entrega 4)
+
+La imagen arranca gunicorn con `newrelic-admin run-program`, que carga el **agente APM de Python** (`newrelic` en `requirements.txt`). El agente instrumenta Flask, SQLAlchemy y psycopg2 sin cambios en el código: tiempos de respuesta por endpoint, tiempos de las consultas a PostgreSQL, Apdex, errores y trazas. La licencia y el nombre de la aplicación llegan por variables de entorno; [`newrelic.ini`](newrelic.ini) solo trae lo que el agente no admite por variables: los 401 de token ausente o inválido se marcan como **errores esperados**, así que aparecen en Errors Inbox pero no cuentan en la tasa de errores, el Apdex ni las alertas.
+
+| Ambiente | Aplicación en New Relic | De dónde sale la licencia |
+|---|---|---|
+| Desarrollo (`docker compose`) | `blacklist-service (dev)` | Archivo `.env` local (no se sube al repo) |
+| Fargate (pipeline de CI/CD) | `blacklist-service (prod)` | SSM Parameter Store `/blacklist-service/NEW_RELIC_LICENSE_KEY` (SecureString), declarado en `secrets` de `taskdef.json` |
+
+Ambiente de desarrollo con el agente:
+
+```powershell
+# .env en la raíz del repo (está en .gitignore); la plantilla es .env.example
+Copy-Item .env.example .env     # y completar NEW_RELIC_LICENSE_KEY
+
+docker compose up -d --build    # app en http://127.0.0.1:8000 + PostgreSQL
+docker compose logs app         # debe aparecer "Reporting to: https://one.newrelic.com/..."
+```
+
+El token para probar en local se genera con el secreto de desarrollo de `docker-compose.yml` (`un-secreto-local-de-al-menos-32-caracteres`). Las pruebas unitarias y la prueba de humo de CodeBuild corren sin licencia: el agente no se activa y no envía nada.
 
 ---
 

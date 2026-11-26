@@ -25,7 +25,8 @@
         { "name": "RDS_PORT", "value": "5432" },
         { "name": "RDS_DB_NAME", "value": "blacklist" },
         { "name": "RDS_USERNAME", "value": "postgres" },
-        { "name": "PROXY_X_FOR", "value": "1" }
+        { "name": "PROXY_X_FOR", "value": "1" },
+        { "name": "NEW_RELIC_APP_NAME", "value": "blacklist-service (prod)" }
       ],
       "secrets": [
         {
@@ -35,6 +36,10 @@
         {
           "name": "JWT_SECRET_KEY",
           "valueFrom": "arn:aws:ssm:us-east-2:117227383263:parameter/blacklist-service/JWT_SECRET_KEY"
+        },
+        {
+          "name": "NEW_RELIC_LICENSE_KEY",
+          "valueFrom": "arn:aws:ssm:us-east-2:117227383263:parameter/blacklist-service/NEW_RELIC_LICENSE_KEY"
         }
       ],
       "logConfiguration": {
