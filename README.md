@@ -198,6 +198,17 @@ docker compose up -d --build    # app en http://127.0.0.1:8000 + PostgreSQL
 docker compose logs app         # debe aparecer "Reporting to: https://one.newrelic.com/..."
 ```
 
+### Pruebas de estrés (k6)
+
+[`stress/blacklist-stress.js`](stress/blacklist-stress.js) genera tráfico mixto contra el ALB: 55 % consultas de emails registrados, 30 % registros nuevos, 5 % consultas de emails inexistentes y 10 % peticiones inválidas (409 duplicado, 400 formato, 401 sin token). Los 4xx se consideran respuestas esperadas; solo los 5xx cuentan como fallas en los umbrales de k6 (p95 < 1 s, fallas < 5 %).
+
+```powershell
+.\stress\run-stress.ps1                  # smoke: 2 usuarios, 30 s
+.\stress\run-stress.ps1 -Perfil stress   # rampa 10 -> 30 -> 60 -> 100 usuarios, ~11 min
+```
+
+El script usa la imagen `grafana/k6` en Docker (no hay que instalar k6), genera el token en memoria con el secreto de SSM y deja el resumen en `stress/results/` (ignorado por git).
+
 El token para probar en local se genera con el secreto de desarrollo de `docker-compose.yml` (`un-secreto-local-de-al-menos-32-caracteres`). Las pruebas unitarias y la prueba de humo de CodeBuild corren sin licencia: el agente no se activa y no envía nada.
 
 ---

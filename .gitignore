@@ -11,3 +11,4 @@ deploy-logs/
 reports/
 .coverage
 coverage.xml
+stress/results/
